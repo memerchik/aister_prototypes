@@ -1,0 +1,39 @@
+# Step 1 - DINOv2-based object retrieval
+
+This folder contains the actual notebook workflow for the image-retrieval prototype described in the root [README.md](/Users/memerchik/Documents/GitHub/aister_prototypes/README.md).
+
+## What is here
+
+- `notebooks/step_1-01_dinov2_image_retrieval.ipynb`: main notebook
+- `outputs/`: cached embeddings, FAISS index, metadata, metrics, and query results
+- `data/`: local-only input data required to run the notebook
+
+## What the notebook expects
+
+The notebook expects local input files under `step_1/data/`.
+For the full structure, mapping examples, and operational details, use the root [README.md](../README.md#reproducibility-notes).
+
+- `data/` is local-only and should not be published to GitHub.
+- The notebook expects `data/dataset_dev/query/` and `data/true_mapping.xlsx` in all modes.
+- `data/dataset_dev/gallery/` is required only when rebuilding the gallery cache.
+
+## Run
+
+There are three ways to run this step:
+
+1. [Run with gallery](../README.md#run-with-gallery-using-predefined-best-parameters)
+   This rebuilds embeddings, metadata, and the FAISS index.
+2. [Run with new best parameters](../README.md#run-with-new-best-parameters)
+   This retunes the score and margin thresholds after rebuilding or updating the gallery.
+3. [Run from cache](../README.md#run-from-cache)
+   This reuses the current cached gallery artifacts and can work without the gallery folder.
+
+## Main outputs
+
+- `outputs/gallery_embeddings.npy`
+- `outputs/gallery_faiss.index`
+- `outputs/gallery_index_metadata.csv`
+- `outputs/metrics_fixed.json`
+- `outputs/query_results_fixed.csv`
+
+For the fuller repository context, data layout explanation, and current metrics summary, use the root [README.md](/Users/memerchik/Documents/GitHub/aister_prototypes/README.md).

@@ -1,49 +1,261 @@
-# AISTER Prototypes
+![DINOv2 workflow](step_1/DINOv2%20Flowchart.png)
+<sub>*Workflow diagram for the DINOv2-based image retrieval prototype included in Step 1.*</sub>
 
-## Case Study 1: DINOv2 Image Retrieval
+# AISTER Image-based historical object similarity matching - Match(A)
 
-### Overview
+The repository contains a reproducible prototype workflow, executable code in Jupyter Notebook, and output artifacts for:
+1. extracting DINOv2 embeddings from a gallery of reference objects,
+2. retrieving nearest matches for query images with FAISS, and
+3. aggregating image-level matches into object-level predictions with confidence-based rejection for unknown objects.
 
-The `dinov2_prototype.ipynb` notebook implements an **image-based object retrieval system** that uses the pretrained DINOv2 vision model to match query images against a gallery of known objects.
+## Navigation
 
-### What It Does
+- [AISTER Image-based historical object similarity matching - Match(A)](#aister-image-based-historical-object-similarity-matching---matcha)
+  - [Navigation](#navigation)
+  - [Prototype description](#prototype-description)
+  - [Who can use the repository and how](#who-can-use-the-repository-and-how)
+  - [Repository description](#repository-description)
+  - [Workflow overview](#workflow-overview)
+  - [Prototype assets](#prototype-assets)
+  - [Technical aspects](#technical-aspects)
+    - [Step 1](#step-1)
+    - [Current output files](#current-output-files)
+  - [Current metrics snapshot](#current-metrics-snapshot)
+  - [Reproducibility notes](#reproducibility-notes)
+    - [Expected local data layout](#expected-local-data-layout)
+- [How to run](#how-to-run)
+  - [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters)
+  - [Run With New Best Parameters](#run-with-new-best-parameters)
+  - [Run From Cache](#run-from-cache)
+  - [Limitations](#limitations)
 
-This notebook solves an **object identification task**: given a query image, determine which object from a gallery it belongs to, or classify it as unknown. It combines:
+## Prototype description
 
-- **Feature Extraction**: Uses DINOv2 (a self-supervised vision model) to extract semantic embeddings from images
-- **Fast Similarity Search**: FAISS enables quick retrieval of the most similar gallery images
-- **Intelligent Aggregation**: Groups matches by object and computes confidence scores
-- **Threshold-Based Confidence**: Uses dual thresholds (score and margin) to decide when predictions are reliable enough
+This case study is a prototype for image-based object identification. It showcases a retrieval pipeline that combines self-supervised computer vision, approximate nearest-neighbour search, and simple thresholding rules to decide when a prediction is confident enough to be accepted.
 
-### How to Use It
+## Who can use the repository and how
 
-1. **Prepare your data**:
-   - Organize gallery images in `data/dataset_dev/gallery/object_001/`, `object_002/`, etc.
-   - Place query images in `data/dataset_dev/query/`
-   - Create a `data/true_mapping.xlsx` file with two columns: query identifier → target object (or "none")
-   
-   **Example mapping format (Excel sheet .xlsx; ignore the column names and numeration. You sheet must have only 2 columns without naming. 1st - query image name; 2nd - object's folder name or none):**
-   | -   | A           | B          |
-   | --- | ----------- | ---------- |
-   | 1   | query_img_1 | object_001 |
-   | 2   | query_img_2 | object_005 |
-   | 3   | query_img_3 | none       |
-   | 4   | query_img_4 | object_012 |
+The repository is intended as an open working prototype for researchers, students, and technical collaborators who want to inspect, rerun, or extend the retrieval workflow. It is especially useful as a reference implementation for future notebook-based experiments that need a cleaner research-repository structure.
 
-2. **Run the notebook**:
-   - Execute all cells from top to bottom
-   - First run builds embeddings and FAISS index (takes time), subsequent runs use cache
+## Repository description
 
-3. **Outputs generated**:
-   - `dinov2_prototype_output/gallery_embeddings.npy` - Cached embeddings
-   - `dinov2_prototype_output/gallery_faiss.index` - FAISS index for fast search
-   - `dinov2_prototype_output/metrics_fixed.json` - Evaluation metrics
-   - `dinov2_prototype_output/query_results_fixed.csv` - Per-query predictions and scores
+The prototype currently consists of **one documented technical step**:
 
-4. **Inspect results**:
-   - Use the `inspect_result_row()` function to visualize a query, its matches, and top-ranked objects
-   - Check `final_results_df` for prediction errors and investigate misclassifications
+- `step_1/` contains the full DINOv2 retrieval workflow.
 
-### Pipeline Diagram
+Each step folder includes:
 
-![DINOv2 Flowchart](case-study-1/DINOv2%20Flowchart.png)
+- `README.md` with documentation for the step
+- `notebooks/` with executable Jupyter Notebook code
+- `data/` for local-only input files required by the notebook and not intended for publication on GitHub
+- `outputs/` with cached artifacts generated by the notebook
+
+## Workflow overview
+
+*Step 1*: DINOv2-based object retrieval
+
+- Load gallery and query images from a local dataset split
+- Extract embeddings using `facebook/dinov2-base`
+- Build or reuse a FAISS index over gallery embeddings
+- Retrieve top image-level matches for each query
+- Aggregate matches by object identifier
+- Apply score and margin thresholds to support unknown-object rejection
+- Export reusable output files and evaluation metrics
+
+## Prototype assets
+
+The current repository snapshot includes:
+
+- **Cached evaluation outputs for 86 labeled queries on a 1000+ images dataset**
+
+## Technical aspects
+
+### Step 1
+
+README for Step 1: `step_1/README.md`
+
+This step contains the notebook `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`, which builds gallery embeddings, creates a FAISS index, evaluates query predictions, and exports result files to `step_1/outputs/`.
+
+### Current output files
+
+- `step_1/outputs/gallery_embeddings.npy`
+- `step_1/outputs/gallery_faiss.index`
+- `step_1/outputs/gallery_index_metadata.csv`
+- `step_1/outputs/metrics_fixed.json`
+- `step_1/outputs/query_results_fixed.csv`
+
+## Current metrics snapshot
+
+The cached metrics in `step_1/outputs/metrics_fixed.json` report the following values for the current dataset snapshot:
+
+| Metric                            |  Value |
+| --------------------------------- | -----: |
+| Score threshold                   |   0.50 |
+| Margin threshold                  |   0.03 |
+| Evaluated queries                 |     86 |
+| Known-object queries              |     69 |
+| Unknown-object queries            |     17 |
+| Top-1 accuracy on known objects   | 53.62% |
+| Top-3 accuracy on known objects   | 60.87% |
+| Unknown-object rejection accuracy | 82.35% |
+| Overall accuracy                  | 50.00% |
+
+## Reproducibility notes
+
+- Run `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb` in Jupyter or Colab.
+- The workflow does not require uploading data to an external service.
+- The required input data must already exist locally under `step_1/data/`.
+- The `step_1/data/` folder is intended for local-only inputs and should not be shared to GitHub.
+- Use `step_1/data/true_mapping.xlsx` for evaluation mapping.
+- The notebook writes all generated artifacts to `step_1/outputs/`.
+- Cached outputs can be reused to avoid recomputing embeddings and the FAISS index.
+
+### Expected local data layout
+
+```text
+step_1/
+  data/
+    true_mapping.xlsx
+    dataset_dev/
+      gallery/
+        object_001/
+          img_001.jpg
+          img_002.jpg
+          ...
+        object_002/
+          img_001.jpg
+          ...
+      query/
+        img_001.jpg
+        img_002.jpg
+        img_003.png
+        ...
+```
+
+Notes:
+
+- Each subfolder inside `gallery/` is treated as one object class.
+- Gallery folder names are expected to be object identifiers such as `object_001`, `object_002`, and so on.
+- `query/` contains the images to classify or reject as unknown.
+- Accepted image extensions are `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.tif`, and `.tiff`.
+- `true_mapping.xlsx` must contain at least two columns: the query identifier in column 1 and the target object in column 2.
+- `true_mapping.xlsx` is read without headers, so the first Excel row is treated as data and included in evaluation.
+- The target object can be written as `7`, `007`, `object_7`, `object_007`, or `none`.
+- The notebook resolves mapping rows against query files by exact filename, exact stem, or numeric suffix.
+
+Example `true_mapping.xlsx` rows:
+
+|     | Column A (query_identifier) | Column B (target_object) |
+| --- | --------------------------- | ------------------------ |
+| 1   | `query_img_1`               | `66`                     |
+| 2   | `query_img_2`               | `60`                     |
+| 3   | `query_img_3`               | `none`                   |
+| 4   | `query_img_4`               | `7`                      |
+
+## How to run
+
+There are three distinct ways to run the notebook, depending on whether you want to rebuild the gallery index, retune the thresholds, or reuse the cached gallery artifacts.
+
+### Run With Gallery (using predefined best parameters)
+
+Use this mode when you have a new or changed gallery and want fresh embeddings/index files.
+
+You need:
+
+- `step_1/data/dataset_dev/gallery/`
+- `step_1/data/dataset_dev/query/`
+- `step_1/data/true_mapping.xlsx`
+
+Steps:
+
+1. Make sure the gallery, query, and mapping files are present under `step_1/data/`.
+2. Delete these cache files from `step_1/outputs/` if you want to force a rebuild:
+   `gallery_embeddings.npy`, `gallery_faiss.index`, `gallery_index_metadata.csv`
+3. Open `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`.
+4. Run the notebook from the top.
+
+Result:
+
+- The notebook scans the gallery folder
+- builds fresh gallery metadata
+- computes new DINOv2 embeddings
+- builds a new FAISS index
+- evaluates the queries
+- writes updated files into `step_1/outputs/`
+
+### Run With New Best Parameters
+
+Use this mode when the gallery, query set, or mapping changed enough that the current fixed thresholds may no longer be the best choice.
+
+This mode is different from the previous one:
+
+- `Run With Gallery (using predefined best parameters)` rebuilds the gallery cache but still uses the fixed values at the top of the notebook
+- `Run With New Best Parameters` retunes those values and then reruns the final evaluation with the new ones
+
+You need:
+
+- `step_1/data/dataset_dev/gallery/`
+- `step_1/data/dataset_dev/query/`
+- `step_1/data/true_mapping.xlsx`
+
+Steps:
+
+1. First follow [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters) so the embeddings, FAISS index, and metadata match the current gallery.
+2. In the notebook, go to `## 13. Search for a better unknown threshold`.
+3. Uncomment the two code cells under section 13:
+   the threshold sweep cell and the optional plotting cell.
+4. Run section 13.
+   This produces `metrics_df`, `best_score_threshold`, and `best_margin_threshold`.
+5. Review the top rows of `metrics_df` and, if useful, the heatmap/plots.
+6. Go back to the constants near the top of the notebook and replace:
+   `BEST_SCORE_THRESHOLD = 0.50`
+   `BEST_MARGIN_THRESHOLD = 0.03`
+   with the new best values printed by section 13.
+7. Rerun section 14 to compute `final_metrics` and `final_results_df` with the new thresholds.
+8. Optionally rerun section 15 to inspect errors with the updated parameters.
+9. Run section 16 to save the updated metrics and query results.
+
+Result:
+
+- The gallery cache matches the current gallery
+- The score and margin thresholds are retuned for the current dataset
+- The final exported metrics and results use the new best parameters
+
+### Run From Cache
+
+Use this mode when you want to evaluate queries or regenerate metrics/results using the existing cached gallery index.
+
+You need:
+
+- `step_1/outputs/gallery_embeddings.npy`
+- `step_1/outputs/gallery_faiss.index`
+- `step_1/outputs/gallery_index_metadata.csv`
+- `step_1/data/dataset_dev/query/`
+- `step_1/data/true_mapping.xlsx`
+
+In this mode, `step_1/data/dataset_dev/gallery/` can be absent.
+
+Steps:
+
+1. Keep the cached files listed above in `step_1/outputs/`.
+2. Keep the query folder and `true_mapping.xlsx` under `step_1/data/`.
+3. Open `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`.
+4. Run the notebook from the top.
+
+Result:
+
+- The notebook loads the existing embeddings, FAISS index, and cached gallery metadata
+- computes embeddings only for the query images
+- evaluates against the cached gallery index
+- writes updated metrics and query-level results
+
+Limitations of cached mode:
+
+- You cannot rebuild the gallery index without the gallery folder.
+- Cells that try to preview matched gallery images need the gallery files; without them, preview images are skipped.
+
+## Limitations
+
+- Retrieval quality depends strongly on the representativeness of the gallery images for each object.
+- The current decision logic uses fixed thresholds tuned on this prototype snapshot and should be revisited if the dataset changes.
+- Included outputs are point-in-time experiment artifacts; rerunning the notebook is recommended after changing images, labels, or model settings.
