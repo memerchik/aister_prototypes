@@ -1,0 +1,11 @@
+{
+  "score_threshold": 0.5,
+  "margin_threshold": 0.03,
+  "n_total": 87,
+  "n_known": 70,
+  "n_unknown": 17,
+  "top1_known": 0.5285714285714286,
+  "top3_known": 0.6,
+  "unknown_rejection": 0.8235294117647058,
+  "overall_accuracy": 0.4942528735632184
+}
