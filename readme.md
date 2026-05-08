@@ -23,9 +23,10 @@ The repository contains a reproducible prototype workflow, executable code in Ju
   - [Current metrics snapshot](#current-metrics-snapshot)
   - [Reproducibility notes](#reproducibility-notes)
     - [Expected local data layout](#expected-local-data-layout)
-  - [How to run](#how-to-run)
-    - [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters)
-    - [Run From Cache](#run-from-cache)
+- [How to run](#how-to-run)
+  - [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters)
+  - [Run With New Best Parameters](#run-with-new-best-parameters)
+  - [Run From Cache](#run-from-cache)
   - [Limitations](#limitations)
 
 ## Prototype description
@@ -153,7 +154,7 @@ Example `true_mapping.xlsx` rows:
 
 ## How to run
 
-There are two distinct ways to run the notebook, depending on whether you want to rebuild the gallery index or reuse the cached one.
+There are three distinct ways to run the notebook, depending on whether you want to rebuild the gallery index, retune the thresholds, or reuse the cached gallery artifacts.
 
 ### Run With Gallery (using predefined best parameters)
 
@@ -181,6 +182,44 @@ Result:
 - builds a new FAISS index
 - evaluates the queries
 - writes updated files into `step_1/outputs/`
+
+### Run With New Best Parameters
+
+Use this mode when the gallery, query set, or mapping changed enough that the current fixed thresholds may no longer be the best choice.
+
+This mode is different from the previous one:
+
+- `Run With Gallery (using predefined best parameters)` rebuilds the gallery cache but still uses the fixed values at the top of the notebook
+- `Run With New Best Parameters` retunes those values and then reruns the final evaluation with the new ones
+
+You need:
+
+- `step_1/data/dataset_dev/gallery/`
+- `step_1/data/dataset_dev/query/`
+- `step_1/data/true_mapping.xlsx`
+
+Steps:
+
+1. First follow [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters) so the embeddings, FAISS index, and metadata match the current gallery.
+2. In the notebook, go to `## 13. Search for a better unknown threshold`.
+3. Uncomment the two code cells under section 13:
+   the threshold sweep cell and the optional plotting cell.
+4. Run section 13.
+   This produces `metrics_df`, `best_score_threshold`, and `best_margin_threshold`.
+5. Review the top rows of `metrics_df` and, if useful, the heatmap/plots.
+6. Go back to the constants near the top of the notebook and replace:
+   `BEST_SCORE_THRESHOLD = 0.50`
+   `BEST_MARGIN_THRESHOLD = 0.03`
+   with the new best values printed by section 13.
+7. Rerun section 14 to compute `final_metrics` and `final_results_df` with the new thresholds.
+8. Optionally rerun section 15 to inspect errors with the updated parameters.
+9. Run section 16 to save the updated metrics and query results.
+
+Result:
+
+- The gallery cache matches the current gallery
+- The score and margin thresholds are retuned for the current dataset
+- The final exported metrics and results use the new best parameters
 
 ### Run From Cache
 

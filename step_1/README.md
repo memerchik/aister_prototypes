@@ -19,11 +19,13 @@ For the full structure, mapping examples, and operational details, use the root 
 
 ## Run
 
-There are two ways to run this step:
+There are three ways to run this step:
 
-1. [Run with gallery](../README.md#run-with-gallery)
+1. [Run with gallery](../README.md#run-with-gallery-using-predefined-best-parameters)
    This rebuilds embeddings, metadata, and the FAISS index.
-2. [Run from cache](../README.md#run-from-cache)
+2. [Run with new best parameters](../README.md#run-with-new-best-parameters)
+   This retunes the score and margin thresholds after rebuilding or updating the gallery.
+3. [Run from cache](../README.md#run-from-cache)
    This reuses the current cached gallery artifacts and can work without the gallery folder.
 
 ## Main outputs
