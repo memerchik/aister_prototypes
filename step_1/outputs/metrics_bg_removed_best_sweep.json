@@ -1,0 +1,15 @@
+{
+  "preprocessing": "bg_removed",
+  "background_removal_enabled": true,
+  "score_threshold": 0.5400000000000003,
+  "margin_threshold": 0.015,
+  "n_total": 87,
+  "n_known": 70,
+  "n_unknown": 17,
+  "top1_known": 0.5,
+  "top3_known": 0.6857142857142857,
+  "top5_known": 0.7571428571428571,
+  "unknown_rejection": 0.6470588235294118,
+  "overall_accuracy": 0.4827586206896552,
+  "approval_rate": 0.5862068965517241
+}
