@@ -22,6 +22,16 @@ env/
 
 # Local prototype data
 step_1/data/**
+step_1/outputs/single_item_visualizations/
+!step_1/workshop_materials/data/gallery/**
+!step_1/workshop_materials/data/gallery/
+!step_1/workshop_materials/data/gallery/object_001/
+!step_1/workshop_materials/data/gallery/object_001/.gitkeep
+!step_1/workshop_materials/data/gallery/object_002/
+!step_1/workshop_materials/data/gallery/object_002/.gitkeep
+!step_1/workshop_materials/data/query/**
+!step_1/workshop_materials/data/query/
+!step_1/workshop_materials/data/query/.gitkeep
 
 # Logs and temporary files
 *.log

@@ -4,9 +4,10 @@ This folder contains the actual notebook workflow for the image-retrieval protot
 
 ## What is here
 
-- `notebooks/step_1-01_dinov2_image_retrieval.ipynb`: main technical notebook
-- `notebooks/step_1-02_dinov2_workshop_tutorial.ipynb`: workshop version with navigation, teaching notes, live statistics, charts, and exercises
-- `notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb`: separate background-removal experiment
+- `notebooks/step_1-01_dinov2_image_retrieval.ipynb`: main raw-image retrieval notebook
+- `notebooks/step_1-02_dinov2_image_retrieval_background_removal.ipynb`: separate background-removal experiment
+- `scripts/make_single_item_visualizations.py`: helper for generating single-item Top-3 retrieval visualizations from saved results
+- `workshop_materials/`: simplified hands-on workshop notebook and local data template for participants
 - `outputs/`: cached embeddings, FAISS index, metadata, metrics, and query results
 - `data/`: local-only input data required to run the notebook
 
@@ -24,14 +25,35 @@ For the full structure, mapping examples, and operational details, use the root 
 
 Use these links to run this step:
 
-1. [Background removal notebook](../readme.md#background-removal-notebook)
+1. [Hands-on workshop materials](workshop_materials/README.md)
+   This is the simplified participant workflow for learning the technology and trying new images.
+2. [Background removal notebook](../readme.md#background-removal-notebook)
    This explains when to use the separate background-removal notebook and cache.
-2. [Run with gallery](../readme.md#run-with-gallery-using-predefined-best-parameters)
+3. [Run with gallery](../readme.md#run-with-gallery-using-predefined-best-parameters)
    This rebuilds embeddings, metadata, and the FAISS index.
-3. [Run with new best parameters](../readme.md#run-with-new-best-parameters)
+4. [Run with new best parameters](../readme.md#run-with-new-best-parameters)
    This retunes the score and margin thresholds after rebuilding or updating the gallery.
-4. [Run from cache](../readme.md#run-from-cache)
+5. [Run from cache](../readme.md#run-from-cache)
    This reuses the current cached gallery artifacts and can work without the gallery folder.
+
+## Single Item Visualizations
+
+Generate local PNG visualizations that show a query image, the correct object image for known queries, Top-3 object candidates, score/margin values, and the final decision:
+
+```bash
+python step_1/scripts/make_single_item_visualizations.py
+```
+
+By default, the helper embeds only the selected query images and compares them with the cached gallery embeddings so each Top-3 visualization shows the exact retrieved gallery image. Use `--match-source folder-first` only as a faster fallback when you do not need exact matched images.
+
+Useful variants:
+
+- `python step_1/scripts/make_single_item_visualizations.py --variant raw --queries img_030.JPG img_077.png`
+- `python step_1/scripts/make_single_item_visualizations.py --examples category --categories wrong_approval false_unknown_approval`
+- `python step_1/scripts/make_single_item_visualizations.py --variant bg --score-threshold 0.54 --margin-threshold 0.015`
+- `python step_1/scripts/make_single_item_visualizations.py --match-source folder-first`
+
+Visualizations are written to `outputs/single_item_visualizations/`. This folder is git-ignored because the generated PNGs contain local dataset images.
 
 ## Main outputs
 
