@@ -78,9 +78,9 @@ README for Step 1: `step_1/README.md`
 
 This step contains the raw-image notebook `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`, which builds gallery embeddings, creates a FAISS index, evaluates query predictions, and exports result files to `step_1/outputs/`.
 
-The background-removal experiment is separated into `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb`. It applies local `rembg` preprocessing before DINOv2 embedding and writes `_bg_removed` output files.
+The background-removal experiment is separated into `step_1/notebooks/step_1-02_dinov2_image_retrieval_background_removal.ipynb`. It applies local `rembg` preprocessing before DINOv2 embedding and writes `_bg_removed` output files.
 
-For teaching and demonstrations, use `step_1/notebooks/step_1-02_dinov2_workshop_tutorial.ipynb`. It includes internal navigation, plain-language explanations, a live metrics dashboard, presentation charts, exercises, and protected workshop-only output paths.
+For the hands-on teaching workflow, use `step_1/workshop_materials/`. It contains a simplified participant notebook and a local data template for trying the retrieval technology with new images.
 
 ### Current output files
 
@@ -183,7 +183,7 @@ There are three run modes, depending on whether you want to rebuild the gallery 
 Use this notebook when the image background may distract the embedding model:
 
 - Raw baseline: `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`
-- Background-removal experiment: `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb`
+- Background-removal experiment: `step_1/notebooks/step_1-02_dinov2_image_retrieval_background_removal.ipynb`
 
 What this changes:
 
@@ -213,7 +213,7 @@ Steps:
 
 1. Make sure the gallery, query, and mapping files are present under `step_1/data/`.
 2. Choose the notebook:
-   use `step_1-01_dinov2_image_retrieval.ipynb` for raw images, or `step_1-03_dinov2_image_retrieval_background_removal.ipynb` for background-removed images.
+   use `step_1-01_dinov2_image_retrieval.ipynb` for raw images, or `step_1-02_dinov2_image_retrieval_background_removal.ipynb` for background-removed images.
 3. Delete the cache files for the selected notebook if you want to force a rebuild:
    raw mode uses `gallery_embeddings.npy`, `gallery_faiss.index`, and `gallery_index_metadata.csv`;
    background-removal mode uses `gallery_embeddings_bg_removed.npy`, `gallery_faiss_bg_removed.index`, and `gallery_index_metadata_bg_removed.csv`.
@@ -281,7 +281,7 @@ For the default raw-image mode, you need:
 - `step_1/data/dataset_dev/query/`
 - `step_1/data/true_mapping.xlsx`
 
-For background-removal mode, open `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb` and use the matching cache files instead:
+For background-removal mode, open `step_1/notebooks/step_1-02_dinov2_image_retrieval_background_removal.ipynb` and use the matching cache files instead:
 
 - `step_1/outputs/gallery_embeddings_bg_removed.npy`
 - `step_1/outputs/gallery_faiss_bg_removed.index`
