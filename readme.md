@@ -24,6 +24,7 @@ The repository contains a reproducible prototype workflow, executable code in Ju
   - [Reproducibility notes](#reproducibility-notes)
     - [Expected local data layout](#expected-local-data-layout)
 - [How to run](#how-to-run)
+  - [Background Removal Notebook](#background-removal-notebook)
   - [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters)
   - [Run With New Best Parameters](#run-with-new-best-parameters)
   - [Run From Cache](#run-from-cache)
@@ -55,6 +56,7 @@ Each step folder includes:
 *Step 1*: DINOv2-based object retrieval
 
 - Load gallery and query images from a local dataset split
+- Optionally remove image backgrounds locally before embedding
 - Extract embeddings using `facebook/dinov2-base`
 - Build or reuse a FAISS index over gallery embeddings
 - Retrieve top image-level matches for each query
@@ -66,7 +68,7 @@ Each step folder includes:
 
 The current repository snapshot includes:
 
-- **Cached evaluation outputs for 86 labeled queries on a 1000+ images dataset**
+- **Cached evaluation outputs for 87 labeled queries against 1,088 gallery images across 74 objects**
 
 ## Technical aspects
 
@@ -74,9 +76,15 @@ The current repository snapshot includes:
 
 README for Step 1: `step_1/README.md`
 
-This step contains the notebook `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`, which builds gallery embeddings, creates a FAISS index, evaluates query predictions, and exports result files to `step_1/outputs/`.
+This step contains the raw-image notebook `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`, which builds gallery embeddings, creates a FAISS index, evaluates query predictions, and exports result files to `step_1/outputs/`.
+
+The background-removal experiment is separated into `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb`. It applies local `rembg` preprocessing before DINOv2 embedding and writes `_bg_removed` output files.
+
+For teaching and demonstrations, use `step_1/notebooks/step_1-02_dinov2_workshop_tutorial.ipynb`. It includes internal navigation, plain-language explanations, a live metrics dashboard, presentation charts, exercises, and protected workshop-only output paths.
 
 ### Current output files
+
+Default raw-image outputs:
 
 - `step_1/outputs/gallery_embeddings.npy`
 - `step_1/outputs/gallery_faiss.index`
@@ -84,21 +92,34 @@ This step contains the notebook `step_1/notebooks/step_1-01_dinov2_image_retriev
 - `step_1/outputs/metrics_fixed.json`
 - `step_1/outputs/query_results_fixed.csv`
 
+The background-removal notebook writes separate output files so raw and background-removed embeddings are not mixed:
+
+- `step_1/outputs/gallery_embeddings_bg_removed.npy`
+- `step_1/outputs/gallery_faiss_bg_removed.index`
+- `step_1/outputs/gallery_index_metadata_bg_removed.csv`
+- `step_1/outputs/metrics_bg_removed.json`
+- `step_1/outputs/query_results_bg_removed.csv`
+
+The local background-removal test run also produced threshold-sweep artifacts:
+
+- `step_1/outputs/metrics_bg_removed_best_sweep.json`
+- `step_1/outputs/threshold_sweep_bg_removed.csv`
+
 ## Current metrics snapshot
 
-The cached metrics in `step_1/outputs/metrics_fixed.json` report the following values for the current dataset snapshot:
+The cached metrics in `step_1/outputs/metrics_fixed.json` report the following values for the current raw-image dataset snapshot:
 
 | Metric                            |  Value |
 | --------------------------------- | -----: |
 | Score threshold                   |   0.50 |
 | Margin threshold                  |   0.03 |
-| Evaluated queries                 |     86 |
-| Known-object queries              |     69 |
+| Evaluated queries                 |     87 |
+| Known-object queries              |     70 |
 | Unknown-object queries            |     17 |
-| Top-1 accuracy on known objects   | 53.62% |
-| Top-3 accuracy on known objects   | 60.87% |
+| Top-1 accuracy on known objects   | 52.86% |
+| Top-3 accuracy on known objects   | 60.00% |
 | Unknown-object rejection accuracy | 82.35% |
-| Overall accuracy                  | 50.00% |
+| Overall accuracy                  | 49.43% |
 
 ## Reproducibility notes
 
@@ -109,6 +130,7 @@ The cached metrics in `step_1/outputs/metrics_fixed.json` report the following v
 - Use `step_1/data/true_mapping.xlsx` for evaluation mapping.
 - The notebook writes all generated artifacts to `step_1/outputs/`.
 - Cached outputs can be reused to avoid recomputing embeddings and the FAISS index.
+- The background-removal notebook uses `rembg` locally. It does not upload images, but the first run may need internet access to install dependencies or download the local segmentation model weights.
 
 ### Expected local data layout
 
@@ -154,7 +176,28 @@ Example `true_mapping.xlsx` rows:
 
 ## How to run
 
-There are three distinct ways to run the notebook, depending on whether you want to rebuild the gallery index, retune the thresholds, or reuse the cached gallery artifacts.
+There are three run modes, depending on whether you want to rebuild the gallery index, retune the thresholds, or reuse cached gallery artifacts. Choose the raw-image notebook for the baseline workflow, or the background-removal notebook for the preprocessing experiment.
+
+### Background Removal Notebook
+
+Use this notebook when the image background may distract the embedding model:
+
+- Raw baseline: `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`
+- Background-removal experiment: `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb`
+
+What this changes:
+
+- The background-removal notebook removes the visible background locally with `rembg`.
+- The foreground object is placed on a white background before DINOv2 embedding.
+- The same preprocessing is applied to both gallery and query images.
+- The notebook always uses separate cache/output files with `_bg_removed` in the filename.
+
+Important:
+
+- Background-removed query embeddings must be searched against background-removed gallery embeddings.
+- The first background-removal run needs the gallery folder because a new gallery cache must be built.
+- After running the background-removal notebook, follow [Run With New Best Parameters](#run-with-new-best-parameters), because the old score and margin thresholds were tuned on raw images.
+- To return to the current cache-based workflow, use the raw baseline notebook.
 
 ### Run With Gallery (using predefined best parameters)
 
@@ -169,10 +212,13 @@ You need:
 Steps:
 
 1. Make sure the gallery, query, and mapping files are present under `step_1/data/`.
-2. Delete these cache files from `step_1/outputs/` if you want to force a rebuild:
-   `gallery_embeddings.npy`, `gallery_faiss.index`, `gallery_index_metadata.csv`
-3. Open `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`.
-4. Run the notebook from the top.
+2. Choose the notebook:
+   use `step_1-01_dinov2_image_retrieval.ipynb` for raw images, or `step_1-03_dinov2_image_retrieval_background_removal.ipynb` for background-removed images.
+3. Delete the cache files for the selected notebook if you want to force a rebuild:
+   raw mode uses `gallery_embeddings.npy`, `gallery_faiss.index`, and `gallery_index_metadata.csv`;
+   background-removal mode uses `gallery_embeddings_bg_removed.npy`, `gallery_faiss_bg_removed.index`, and `gallery_index_metadata_bg_removed.csv`.
+4. Open the selected notebook.
+5. Run the notebook from the top.
 
 Result:
 
@@ -200,20 +246,22 @@ You need:
 
 Steps:
 
-1. First follow [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters) so the embeddings, FAISS index, and metadata match the current gallery.
+1. First follow [Run With Gallery (using predefined best parameters)](#run-with-gallery-using-predefined-best-parameters) in the notebook you want to evaluate, so the embeddings, FAISS index, metadata, and preprocessing mode match the current gallery.
 2. In the notebook, go to `## 13. Search for a better unknown threshold`.
-3. Uncomment the two code cells under section 13:
+3. In the raw-image notebook, uncomment the two code cells under section 13:
    the threshold sweep cell and the optional plotting cell.
+   In the background-removal notebook, section 13 is already active and is optimized to compute query rankings once before sweeping thresholds.
 4. Run section 13.
    This produces `metrics_df`, `best_score_threshold`, and `best_margin_threshold`.
 5. Review the top rows of `metrics_df` and, if useful, the heatmap/plots.
-6. Go back to the constants near the top of the notebook and replace:
+6. For a permanent setting, go back to the constants near the top of the notebook and replace:
    `BEST_SCORE_THRESHOLD = 0.50`
    `BEST_MARGIN_THRESHOLD = 0.03`
    with the new best values printed by section 13.
-7. Rerun section 14 to compute `final_metrics` and `final_results_df` with the new thresholds.
+   In the background-removal notebook, section 14 automatically uses `best_score_threshold` and `best_margin_threshold` if section 13 was run in the same session.
+7. Run section 14 to compute `final_metrics` and `final_results_df` with the selected thresholds.
 8. Optionally rerun section 15 to inspect errors with the updated parameters.
-9. Run section 16 to save the updated metrics and query results.
+9. Run section 16 to save the updated metrics and query results. In the background-removal notebook, this also saves the threshold sweep when section 13 was run.
 
 Result:
 
@@ -225,11 +273,19 @@ Result:
 
 Use this mode when you want to evaluate queries or regenerate metrics/results using the existing cached gallery index.
 
-You need:
+For the default raw-image mode, you need:
 
 - `step_1/outputs/gallery_embeddings.npy`
 - `step_1/outputs/gallery_faiss.index`
 - `step_1/outputs/gallery_index_metadata.csv`
+- `step_1/data/dataset_dev/query/`
+- `step_1/data/true_mapping.xlsx`
+
+For background-removal mode, open `step_1/notebooks/step_1-03_dinov2_image_retrieval_background_removal.ipynb` and use the matching cache files instead:
+
+- `step_1/outputs/gallery_embeddings_bg_removed.npy`
+- `step_1/outputs/gallery_faiss_bg_removed.index`
+- `step_1/outputs/gallery_index_metadata_bg_removed.csv`
 - `step_1/data/dataset_dev/query/`
 - `step_1/data/true_mapping.xlsx`
 
@@ -239,7 +295,7 @@ Steps:
 
 1. Keep the cached files listed above in `step_1/outputs/`.
 2. Keep the query folder and `true_mapping.xlsx` under `step_1/data/`.
-3. Open `step_1/notebooks/step_1-01_dinov2_image_retrieval.ipynb`.
+3. Open the raw-image notebook or the background-removal notebook, depending on which cache you want to use.
 4. Run the notebook from the top.
 
 Result:
