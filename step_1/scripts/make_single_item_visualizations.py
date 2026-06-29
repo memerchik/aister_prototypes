@@ -132,6 +132,31 @@ def parse_ranked_ids(value: object) -> list[str]:
     return [str(item) for item in parsed]
 
 
+def parse_float_list(value: object) -> list[float]:
+    if is_missing(value):
+        return []
+    if isinstance(value, list):
+        raw_values = value
+    else:
+        try:
+            raw_values = ast.literal_eval(str(value))
+        except (SyntaxError, ValueError):
+            return []
+    if not isinstance(raw_values, list):
+        return []
+
+    result = []
+    for item in raw_values:
+        if is_missing(item):
+            result.append(np.nan)
+            continue
+        try:
+            result.append(float(item))
+        except (TypeError, ValueError):
+            result.append(np.nan)
+    return result
+
+
 def l2_normalize(vectors: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(vectors, axis=1, keepdims=True)
     return vectors / np.maximum(norms, 1e-12)
@@ -614,6 +639,7 @@ def make_card(
     margin_threshold: float,
 ) -> dict[str, str]:
     ranked_ids = parse_ranked_ids(row["ranked_ids"])[:top_k]
+    ranked_scores = parse_float_list(row.get("top3_scores"))[:top_k]
     category, outcome, outcome_color = classify_row(row, ranked_ids)
     category = category_hint or category
 
@@ -667,12 +693,16 @@ def make_card(
     for index, object_id in enumerate(ranked_ids):
         x1 = candidate_x + index * (candidate_w + gap)
         box = (x1, candidate_y, x1 + candidate_w, candidate_y + candidate_h)
-        score_text = None
-        if index == 0:
-            score_text = f"score {format_score(row.get('best_score'))}"
-        elif index == 1:
-            score_text = f"score {format_score(row.get('second_score'))}"
         evidence = exact_matches.get(object_id)
+        candidate_score = ranked_scores[index] if index < len(ranked_scores) else None
+        if is_missing(candidate_score):
+            if index == 0:
+                candidate_score = row.get("best_score")
+            elif index == 1:
+                candidate_score = row.get("second_score")
+        if is_missing(candidate_score) and evidence is not None:
+            candidate_score = evidence.score
+        score_text = f"score {format_score(candidate_score)}"
         fallback = gallery_lookup.get(object_id, [None])[0]
         image_path = evidence.path if evidence else fallback
         image_name = evidence.image_name if evidence else (fallback.name if fallback else None)
@@ -701,8 +731,10 @@ def make_card(
             draw.text((x1 + 24, candidate_y + 70), "not available", font=FONTS["body"], fill=COLORS["muted"])
 
     metric_y = 870
-    draw_metric_box(draw, (60, metric_y, 380, 1015), "Top-1 score", format_score(row.get("best_score")), COLORS["blue"])
-    draw_metric_box(draw, (410, metric_y, 730, 1015), "Top-2 score", format_score(row.get("second_score")), COLORS["blue"])
+    top1_score = ranked_scores[0] if len(ranked_scores) > 0 else row.get("best_score")
+    top2_score = ranked_scores[1] if len(ranked_scores) > 1 else row.get("second_score")
+    draw_metric_box(draw, (60, metric_y, 380, 1015), "Top-1 score", format_score(top1_score), COLORS["blue"])
+    draw_metric_box(draw, (410, metric_y, 730, 1015), "Top-2 score", format_score(top2_score), COLORS["blue"])
     draw_metric_box(draw, (760, metric_y, 1080, 1015), "Margin", format_score(row.get("margin"), 4), outcome_color)
     rule_box = (1110, metric_y, 1495, 1015)
     draw.rounded_rectangle(rule_box, radius=18, fill=COLORS["panel"], outline=COLORS["line"], width=2)
@@ -759,9 +791,42 @@ def category_for_row(row: pd.Series) -> str:
     return category
 
 
+def normalize_results_df(df: pd.DataFrame, *, score_threshold: float, margin_threshold: float) -> pd.DataFrame:
+    """Support both full prototype results and the simpler workshop CSV."""
+    df = df.copy()
+    if "ranked_ids" not in df.columns and "top3_objects" in df.columns:
+        df["ranked_ids"] = df["top3_objects"]
+    if "best_score" not in df.columns and "top1_score" in df.columns:
+        df["best_score"] = df["top1_score"]
+    if "second_score" not in df.columns and "top3_scores" in df.columns:
+        df["second_score"] = df["top3_scores"].apply(
+            lambda value: parse_float_list(value)[1] if len(parse_float_list(value)) > 1 else np.nan
+        )
+    if "second_score" not in df.columns:
+        df["second_score"] = np.nan
+    if "margin" not in df.columns and {"best_score", "second_score"}.issubset(df.columns):
+        df["margin"] = pd.to_numeric(df["best_score"], errors="coerce") - pd.to_numeric(df["second_score"], errors="coerce")
+    if "margin" not in df.columns:
+        df["margin"] = np.nan
+    if "pred_object" not in df.columns and "top1_object" in df.columns:
+        best_scores = pd.to_numeric(df["best_score"], errors="coerce")
+        margins = pd.to_numeric(df["margin"], errors="coerce")
+        accepted = best_scores.ge(score_threshold) & margins.ge(margin_threshold)
+        df["pred_object"] = df["top1_object"].where(accepted, None)
+    if "is_known" not in df.columns and "true_object" in df.columns:
+        df["is_known"] = df["true_object"].apply(lambda value: clean_object_id(value) is not None)
+
+    required = {"query_name", "true_object", "pred_object", "ranked_ids", "best_score", "second_score", "margin", "is_known"}
+    missing = sorted(required.difference(df.columns))
+    if missing:
+        raise ValueError(f"Results CSV is missing required columns after normalization: {missing}")
+    return df
+
+
 def select_rows(df: pd.DataFrame, variant: str, args: argparse.Namespace) -> list[tuple[str, pd.Series]]:
     if args.queries:
-        return rows_by_query(df, args.queries)
+        selected = rows_by_query(df, args.queries)
+        return selected[: args.limit] if args.limit else selected
 
     if args.examples == "curated":
         selected = []
@@ -769,7 +834,11 @@ def select_rows(df: pd.DataFrame, variant: str, args: argparse.Namespace) -> lis
             found = rows_by_query(df, [query_name])[:1]
             if found:
                 selected.append((category, found[0][1]))
-        return selected
+        return selected[: args.limit] if args.limit else selected
+
+    if args.examples == "first":
+        rows = [("first_rows", row) for _, row in df.head(args.limit or len(df)).iterrows()]
+        return rows
 
     df = df.copy()
     df["_category"] = df.apply(category_for_row, axis=1)
@@ -785,6 +854,8 @@ def select_rows(df: pd.DataFrame, variant: str, args: argparse.Namespace) -> lis
             rows = category_df.head(args.max_per_category).iterrows()
         for _, row in rows:
             selected.append((category, row))
+            if args.limit and len(selected) >= args.limit:
+                return selected
     return selected
 
 
@@ -822,6 +893,8 @@ def parse_args() -> argparse.Namespace:
               python step_1/scripts/make_single_item_visualizations.py
               python step_1/scripts/make_single_item_visualizations.py --variant raw --queries img_030.JPG img_077.png
               python step_1/scripts/make_single_item_visualizations.py --examples category --categories wrong_approval false_unknown_approval
+              python step_1/scripts/make_single_item_visualizations.py --variant raw --examples first --limit 20 --output-dir step_1/outputs/visualizations
+              python step_1/scripts/make_single_item_visualizations.py --variant raw --examples first --limit 20 --query-dir step_1/workshop_materials/data/query --gallery-dir step_1/workshop_materials/data/gallery --results-path step_1/workshop_materials/outputs/query_results.csv --metadata-path step_1/workshop_materials/outputs/gallery_metadata.csv --embeddings-path step_1/workshop_materials/outputs/gallery_embeddings.npy --output-dir step_1/workshop_materials/outputs/visualizations
               python step_1/scripts/make_single_item_visualizations.py --variant bg --score-threshold 0.54 --margin-threshold 0.015
               python step_1/scripts/make_single_item_visualizations.py --match-source folder-first
             """
@@ -830,13 +903,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--variant", choices=["raw", "bg", "both"], default="both")
     parser.add_argument(
         "--examples",
-        choices=["curated", "category", "all"],
+        choices=["curated", "category", "all", "first"],
         default="curated",
-        help="curated: built-in teaching examples; category: first N per category; all: every result row.",
+        help="curated: built-in teaching examples; first: first rows in CSV order; category: first N per category; all: every result row by category.",
     )
     parser.add_argument("--queries", nargs="*", help="Specific query filenames to export, for example img_030.JPG.")
     parser.add_argument("--categories", nargs="*", choices=CATEGORY_ORDER, help="Categories used with --examples category/all.")
     parser.add_argument("--max-per-category", type=int, default=3, help="Rows per category when --examples category is used.")
+    parser.add_argument("--limit", type=int, help="Maximum total rows to export after filtering.")
     parser.add_argument("--top-k", type=int, default=3, help="Number of ranked object candidates to show.")
     parser.add_argument(
         "--match-source",
@@ -846,13 +920,35 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--top-k-images", type=int, default=DEFAULT_TOP_K_IMAGES, help="Image-level neighbors used to recover exact matched images.")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--query-dir", type=Path, help="Override the query image folder.")
+    parser.add_argument("--gallery-dir", type=Path, help="Override the gallery image folder.")
+    parser.add_argument("--results-path", type=Path, help="Override the result CSV used for the selected variant.")
+    parser.add_argument("--metadata-path", type=Path, help="Override the gallery metadata CSV used for the selected variant.")
+    parser.add_argument("--embeddings-path", type=Path, help="Override the gallery embeddings .npy used for exact matched images.")
     parser.add_argument("--score-threshold", type=float, default=0.50, help="Displayed score threshold.")
     parser.add_argument("--margin-threshold", type=float, default=0.03, help="Displayed margin threshold.")
     return parser.parse_args()
 
 
 def main() -> int:
+    global QUERY_DIR, GALLERY_DIR
+
     args = parse_args()
+    if args.query_dir:
+        QUERY_DIR = args.query_dir
+    if args.gallery_dir:
+        GALLERY_DIR = args.gallery_dir
+
+    variants = ["raw", "bg"] if args.variant == "both" else [args.variant]
+    for variant in variants:
+        spec = VARIANT_SPECS[variant]
+        if args.results_path:
+            spec["results"] = args.results_path
+        if args.metadata_path:
+            spec["metadata"] = args.metadata_path
+        if args.embeddings_path:
+            spec["embeddings"] = args.embeddings_path
+
     if not QUERY_DIR.exists() or not GALLERY_DIR.exists():
         print(
             f"Missing local data folder. Expected query images in {QUERY_DIR} and gallery images in {GALLERY_DIR}.",
@@ -860,7 +956,6 @@ def main() -> int:
         )
         return 1
 
-    variants = ["raw", "bg"] if args.variant == "both" else [args.variant]
     generated_rows: list[dict[str, str]] = []
     exact_resolver = (
         ExactMatchResolver(top_k_images=args.top_k_images)
@@ -876,7 +971,11 @@ def main() -> int:
             print(f"Skipping {variant}: missing {results_path}", file=sys.stderr)
             continue
 
-        results_df = pd.read_csv(results_path)
+        results_df = normalize_results_df(
+            pd.read_csv(results_path),
+            score_threshold=args.score_threshold,
+            margin_threshold=args.margin_threshold,
+        )
         gallery_lookup = build_gallery_lookup(metadata_path, GALLERY_DIR)
         selected_rows = select_rows(results_df, variant, args)
         if not selected_rows:
