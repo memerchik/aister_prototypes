@@ -37,6 +37,7 @@ data/
     query_001.jpg
     query_002.jpg
   query_labels.csv
+  true_mapping.xlsx
 ```
 
 Rules:
@@ -45,7 +46,9 @@ Rules:
 - The folder name is the object ID, for example `object_001`.
 - Put multiple reference views of the same object inside the same object folder.
 - Put query images directly inside `data/query/`.
-- Image filenames can be any valid image names, but `query_labels.csv` must use the exact query filenames.
+- Image filenames can be any valid image names.
+- For labels, use either `true_mapping.xlsx` or `query_labels.csv`.
+- If both files are present, the notebook uses `true_mapping.xlsx` first.
 
 Example `query_labels.csv`:
 
@@ -57,6 +60,22 @@ query_unknown.jpg,
 ```
 
 Leave `true_object` empty for unknown queries.
+
+Alternative Excel label file:
+
+```text
+data/true_mapping.xlsx
+```
+
+The Excel file should have no required header row. The notebook reads the first two columns:
+
+```text
+query_001.jpg  object_001
+query_002.jpg  object_002
+query_003.jpg
+```
+
+It also supports numeric target IDs such as `66`, which are normalized to `object_066`.
 
 ## Optional Dataset Builder
 

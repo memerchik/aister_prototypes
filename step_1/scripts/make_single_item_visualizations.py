@@ -976,6 +976,8 @@ def main() -> int:
             score_threshold=args.score_threshold,
             margin_threshold=args.margin_threshold,
         )
+        known_truth_count = int(results_df["true_object"].apply(lambda value: clean_object_id(value) is not None).sum())
+        print(f"{variant}: loaded {known_truth_count}/{len(results_df)} rows with known true_object labels.")
         gallery_lookup = build_gallery_lookup(metadata_path, GALLERY_DIR)
         selected_rows = select_rows(results_df, variant, args)
         if not selected_rows:
